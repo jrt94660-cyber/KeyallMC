@@ -12,7 +12,7 @@ import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
 
-import java.io.File;
+import java.io.File;\nimport java.io.InputStreamReader;\nimport java.nio.charset.StandardCharsets;
 import java.util.Locale;
 
 public final class KeyallMC extends JavaPlugin {
@@ -58,7 +58,7 @@ public final class KeyallMC extends JavaPlugin {
             return YamlConfiguration.loadConfiguration(file);
         } catch (Exception ex) {
             getLogger().warning("Could not read " + path + ": " + ex.getMessage() + ". Using defaults for this file.");
-            return YamlConfiguration.loadConfiguration(new File(getResourcePath(path)));
+            try (var stream = getResource(path)) {\n                if (stream == null) return new YamlConfiguration();\n                return YamlConfiguration.loadConfiguration(new InputStreamReader(stream, StandardCharsets.UTF_8));\n            } catch (Exception fallbackEx) {\n                getLogger().warning("Bundled defaults unavailable for " + path + ": " + fallbackEx.getMessage());\n                return new YamlConfiguration();\n            }
         }
     }
 
@@ -131,7 +131,7 @@ public final class KeyallMC extends JavaPlugin {
             String announcement = keyallSettings.getString("announcement", "")
                     .replace("%amount%", Integer.toString(amount))
                     .replace("%key%", key).replace("%players%", Integer.toString(recipients));
-            if (!announcement.isBlank()) Bukkit.broadcast(MINI.deserialize(announcement));
+            if (!announcement.isBlank()) {\n                for (Player online : Bukkit.getOnlinePlayers()) sendRaw(online, announcement);\n            }
         }
         return true;
     }
@@ -149,11 +149,11 @@ public final class KeyallMC extends JavaPlugin {
     private void sendRaw(CommandSender sender, String raw) {
         if (sender instanceof Player player) {
             String destination = messageSettings.getString("destination", "ACTION_BAR").toUpperCase(Locale.ROOT);
-            Component component = MINI.deserialize(raw);
+            Component component = deserialize(raw);
             switch (destination) {
                 case "CHAT" -> player.sendMessage(component);
                 case "TITLE" -> player.showTitle(net.kyori.adventure.title.Title.title(
-                        component, MINI.deserialize(messageSettings.getString("title-subtitle", "")),
+                        component, deserialize(messageSettings.getString("title-subtitle", "")),
                         net.kyori.adventure.title.Title.Times.times(
                                 java.time.Duration.ofMillis(Math.max(0, messageSettings.getInt("title-fade-in", 5)) * 50L),
                                 java.time.Duration.ofMillis(Math.max(0, messageSettings.getInt("title-stay", 40)) * 50L),
@@ -161,7 +161,7 @@ public final class KeyallMC extends JavaPlugin {
                 default -> player.sendActionBar(component);
             }
         } else {
-            sender.sendMessage(MINI.deserialize(raw));
+            sender.sendMessage(deserialize(raw));
         }
     }
 }
