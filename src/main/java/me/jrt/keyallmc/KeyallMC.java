@@ -6,165 +6,124 @@ import net.kyori.adventure.text.minimessage.MiniMessage;
 import org.bukkit.Bukkit;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
+import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.scheduler.BukkitTask;
 
 import java.io.File;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.util.Locale;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 public final class KeyallMC extends JavaPlugin {
     private static final MiniMessage MINI = MiniMessage.miniMessage();
     private static final LegacyComponentSerializer LEGACY = LegacyComponentSerializer.legacyAmpersand();
-    private FileConfiguration messages;
-    private FileConfiguration keyallSettings;
-    private FileConfiguration messageSettings;
+    private FileConfiguration messages, keyallSettings, messageSettings;
+    private final Map<String, Long> nextRuns = new ConcurrentHashMap<>();
+    private BukkitTask timerTask;
 
-    @Override
-    public void onEnable() {
+    @Override public void onEnable() {
         saveDefaultConfig();
         saveResourceIfMissing("messages.yml");
         saveResourceIfMissing("settings/keyall.yml");
         saveResourceIfMissing("settings/message-settings.yml");
         loadSeparatedConfigs();
-
-        PluginCommand command = getCommand("keyall");
+        var command = getCommand("keyall");
         if (command != null) command.setExecutor(this::onCommand);
-        else getLogger().severe("Command 'keyall' is missing from plugin.yml; plugin remains enabled but command is unavailable.");
-
-        if (!getConfig().getBoolean("enabled", true)) {
-            getLogger().info("KeyallMC is disabled in config.yml.");
-        } else {
-            getLogger().info("KeyallMC enabled.");
-        }
+        if (getConfig().getBoolean("enabled", true)) startTimers();
+        if (Bukkit.getPluginManager().getPlugin("PlaceholderAPI") != null) new KeyallPlaceholder(this).register();
+        getLogger().info("KeyallMC enabled.");
     }
+    @Override public void onDisable() { if (timerTask != null) timerTask.cancel(); }
 
     private void saveResourceIfMissing(String path) {
-        File target = new File(getDataFolder(), path);
-        if (!target.exists()) saveResource(path, false);
+        File f = new File(getDataFolder(), path); if (!f.exists()) saveResource(path, false);
     }
-
     private void loadSeparatedConfigs() {
-        messages = loadYamlSafely("messages.yml");
-        keyallSettings = loadYamlSafely("settings/keyall.yml");
+        messages = loadYamlSafely("messages.yml"); keyallSettings = loadYamlSafely("settings/keyall.yml");
         messageSettings = loadYamlSafely("settings/message-settings.yml");
     }
-
     private FileConfiguration loadYamlSafely(String path) {
-        File file = new File(getDataFolder(), path);
-        try {
-            return YamlConfiguration.loadConfiguration(file);
-        } catch (Exception ex) {
-            getLogger().warning("Could not read " + path + ": " + ex.getMessage() + ". Using defaults for this file.");
-            try (var stream = getResource(path)) {
-                if (stream == null) return new YamlConfiguration();
-                return YamlConfiguration.loadConfiguration(new InputStreamReader(stream, StandardCharsets.UTF_8));
-            } catch (Exception fallbackEx) {
-                getLogger().warning("Bundled defaults unavailable for " + path + ": " + fallbackEx.getMessage());
-                return new YamlConfiguration();
-            }
+        try { return YamlConfiguration.loadConfiguration(new File(getDataFolder(), path)); }
+        catch (Exception ex) {
+            getLogger().warning("Invalid "+path+"; using bundled defaults: "+ex.getMessage());
+            try (var in=getResource(path)) { return in==null?new YamlConfiguration():YamlConfiguration.loadConfiguration(new InputStreamReader(in, StandardCharsets.UTF_8)); }
+            catch(Exception fallback){ return new YamlConfiguration(); }
         }
     }
-
-    private boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
-        if (!sender.hasPermission("keyallmc.admin")) {
-            sendMessage(sender, "no-permission");
-            return true;
+    public String timerPlaceholder(String id) {
+        Long end=nextRuns.get(id.toLowerCase(Locale.ROOT)); if(end==null) return "N/A";
+        long seconds=Math.max(0,(end-System.currentTimeMillis())/1000);
+        return String.format("%02d:%02d:%02d",seconds/3600,(seconds%3600)/60,seconds%60);
+    }
+    private void startTimers() {
+        if(timerTask!=null) timerTask.cancel(); nextRuns.clear();
+        ConfigurationSection schedules=keyallSettings.getConfigurationSection("keyalls");
+        if(schedules==null) return;
+        for(String id:schedules.getKeys(false)) {
+            ConfigurationSection s=schedules.getConfigurationSection(id);
+            if(s!=null && s.getBoolean("enabled",true)) nextRuns.put(id.toLowerCase(Locale.ROOT),
+                System.currentTimeMillis()+Math.max(1,s.getInt("interval-minutes",30))*60_000L);
         }
-        if (args.length == 1 && args[0].equalsIgnoreCase("reload")) {
-            reloadConfig();
-            loadSeparatedConfigs();
-            sendMessage(sender, "reloaded");
-            return true;
-        }
-        if (!getConfig().getBoolean("enabled", true)) {
-            sendMessage(sender, "disabled");
-            return true;
-        }
-        if (args.length < 1 || args.length > 2) {
-            sendMessage(sender, "usage");
-            return true;
-        }
-
-        String key = args[0].trim();
-        if (key.isEmpty() || key.equalsIgnoreCase("reload")) {
-            sendMessage(sender, "unknown-key");
-            return true;
-        }
-        int amount = 1;
-        if (args.length == 2) {
-            try {
-                amount = Integer.parseInt(args[1]);
-                if (amount <= 0) throw new NumberFormatException("not positive");
-            } catch (NumberFormatException ex) {
-                sendMessage(sender, "invalid-amount");
-                return true;
+        timerTask=Bukkit.getScheduler().runTaskTimer(this,()->{
+            if(!getConfig().getBoolean("enabled",true)) return;
+            for(String id:nextRuns.keySet().toArray(String[]::new)) {
+                ConfigurationSection s=keyallSettings.getConfigurationSection("keyalls."+id);
+                if(s==null || !s.getBoolean("enabled",true)) continue;
+                long remaining=nextRuns.getOrDefault(id,0L)-System.currentTimeMillis();
+                if(remaining<=0) {
+                    distribute(s.getString("key","key"),Math.max(1,s.getInt("amount",1)),id);
+                    nextRuns.put(id,System.currentTimeMillis()+Math.max(1,s.getInt("interval-minutes",30))*60_000L);
+                } else {
+                    int announceSeconds=Math.max(0,s.getInt("announce-seconds",10));
+                    if(remaining<=announceSeconds*1000L) {
+                        String msg=keyallSettings.getString("timer-message","<yellow>You're about to get %key name% %amount%</yellow>")
+                            .replace("%key name%",s.getString("key","key")).replace("%key%",s.getString("key","key"))
+                            .replace("%amount%",Integer.toString(Math.max(1,s.getInt("amount",1))));
+                        for(Player p:Bukkit.getOnlinePlayers()) p.sendActionBar(deserialize(msg));
+                    }
+                }
             }
+        },20L,20L);
+    }
+    private void distribute(String key,int amount,String id) {
+        String cmd=keyallSettings.getString("reward-command","smpcrate keyall keyall %player%").trim();
+        if(cmd.isBlank()) { getLogger().warning("Reward command is blank; schedule "+id+" skipped."); return; }
+        for(Player p:Bukkit.getOnlinePlayers()) Bukkit.dispatchCommand(Bukkit.getConsoleSender(),
+            cmd.replace("%player%",p.getName()).replace("%key%",key).replace("%amount%",String.valueOf(amount)));
+        if(keyallSettings.getBoolean("announce",true)) {
+            String ann=keyallSettings.getString("announcement","").replace("%key%",key).replace("%amount%",String.valueOf(amount)).replace("%players%",String.valueOf(Bukkit.getOnlinePlayers().size()));
+            if(!ann.isBlank()) for(Player p:Bukkit.getOnlinePlayers()) sendRaw(p,ann);
         }
-        if (Bukkit.getOnlinePlayers().isEmpty()) {
-            sendMessage(sender, "no-players");
-            return true;
+    }
+    private boolean onCommand(CommandSender sender,Command cmd,String label,String[] args) {
+        if(!sender.hasPermission("keyallmc.admin")) { sendRaw(sender,message("no-permission")); return true; }
+        if(args.length==1 && args[0].equalsIgnoreCase("reload")) {
+            reloadConfig(); loadSeparatedConfigs(); startTimers(); sendRaw(sender,message("reloaded")); return true;
         }
-
-        String rewardCommand = keyallSettings.getString("reward-command", "crate givekey %player% %key% %amount%");
-        if (rewardCommand == null || rewardCommand.isBlank()) {
-            getLogger().warning("settings/keyall.yml reward-command is blank. No rewards were run.");
-            sendMessage(sender, "usage");
-            return true;
+        if(args.length==2 && args[0].equalsIgnoreCase("run")) {
+            ConfigurationSection s=keyallSettings.getConfigurationSection("keyalls."+args[1]);
+            if(s==null){sendRaw(sender,message("unknown-schedule"));return true;}
+            distribute(s.getString("key","key"),Math.max(1,s.getInt("amount",1)),args[1]); sendRaw(sender,message("schedule-run")); return true;
         }
-
-        int recipients = 0;
-        for (Player player : Bukkit.getOnlinePlayers()) {
-            String expanded = rewardCommand.replace("%player%", player.getName())
-                    .replace("%key%", key)
-                    .replace("%amount%", Integer.toString(amount));
-            Bukkit.dispatchCommand(Bukkit.getConsoleSender(), expanded);
-            recipients++;
-        }
-
-        String success = message("success").replace("%amount%", Integer.toString(amount))
-                .replace("%key%", key).replace("%players%", Integer.toString(recipients));
-        sendRaw(sender, success);
-        if (keyallSettings.getBoolean("announce", true)) {
-            String announcement = keyallSettings.getString("announcement", "")
-                    .replace("%amount%", Integer.toString(amount))
-                    .replace("%key%", key).replace("%players%", Integer.toString(recipients));
-            if (!announcement.isBlank()) {
-                for (Player online : Bukkit.getOnlinePlayers()) sendRaw(online, announcement);
-            }
-        }
+        if(!getConfig().getBoolean("enabled",true)){sendRaw(sender,message("disabled"));return true;}
+        if(args.length<1 || args.length>2){sendRaw(sender,message("usage"));return true;}
+        String key=args[0].trim(); int amount=1;
+        if(args.length==2) try{amount=Integer.parseInt(args[1]);if(amount<=0)throw new NumberFormatException();}catch(NumberFormatException e){sendRaw(sender,message("invalid-amount"));return true;}
+        if(Bukkit.getOnlinePlayers().isEmpty()){sendRaw(sender,message("no-players"));return true;}
+        distribute(key,amount,"manual");
+        sendRaw(sender,message("success").replace("%amount%",String.valueOf(amount)).replace("%key%",key).replace("%players%",String.valueOf(Bukkit.getOnlinePlayers().size())));
         return true;
     }
-
-    private void sendMessage(CommandSender sender, String key) {
-        sendRaw(sender, message(key));
-    }
-
-    private String message(String key) {
-        String value = messages.getString(key);
-        if (value == null) return "<red>Missing message: " + key + "</red>";
-        return value;
-    }
-
-    private void sendRaw(CommandSender sender, String raw) {
-        if (sender instanceof Player player) {
-            String destination = messageSettings.getString("destination", "ACTION_BAR").toUpperCase(Locale.ROOT);
-            Component component = deserialize(raw);
-            switch (destination) {
-                case "CHAT" -> player.sendMessage(component);
-                case "TITLE" -> player.showTitle(net.kyori.adventure.title.Title.title(
-                        component, deserialize(messageSettings.getString("title-subtitle", "")),
-                        net.kyori.adventure.title.Title.Times.times(
-                                java.time.Duration.ofMillis(Math.max(0, messageSettings.getInt("title-fade-in", 5)) * 50L),
-                                java.time.Duration.ofMillis(Math.max(0, messageSettings.getInt("title-stay", 40)) * 50L),
-                                java.time.Duration.ofMillis(Math.max(0, messageSettings.getInt("title-fade-out", 10)) * 50L))));
-                default -> player.sendActionBar(component);
-            }
-        } else {
-            sender.sendMessage(deserialize(raw));
-        }
-    }
+    private String message(String k){return messages.getString(k,"<red>Missing message: "+k+"</red>");}
+    private void sendRaw(CommandSender sender,String raw){if(sender instanceof Player p) {
+        String mode=messageSettings.getString("destination","ACTION_BAR").toUpperCase(Locale.ROOT); Component c=deserialize(raw);
+        switch(mode){case "CHAT"->p.sendMessage(c);case "TITLE"->p.showTitle(net.kyori.adventure.title.Title.title(c,deserialize(messageSettings.getString("title-subtitle","")),net.kyori.adventure.title.Title.Times.times(java.time.Duration.ofMillis(Math.max(0,messageSettings.getInt("title-fade-in",5))*50L),java.time.Duration.ofMillis(Math.max(0,messageSettings.getInt("title-stay",40))*50L),java.time.Duration.ofMillis(Math.max(0,messageSettings.getInt("title-fade-out",10))*50L))));default->p.sendActionBar(c);}
+    } else sender.sendMessage(deserialize(raw));}
+    public Component deserialize(String raw){try{return MINI.deserialize(raw);}catch(Exception e){return LEGACY.deserialize(raw);}}
 }
