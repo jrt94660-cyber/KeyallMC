@@ -6,9 +6,13 @@ description: Configurable crate key timers and distribution.
 author: JRT
 softdepend: [PlaceholderAPI]
 commands:
+  keyallmc:
+    description: Give configured keys to all online players.
+    usage: /keyallmc keyall <keyname> | /keyallmc allkeys <amount>
+    permission: keyallmc.admin
   keyall:
     description: Distribute or manage keyall schedules.
-    usage: /keyall <key> [amount] | /keyall run <schedule> | /keyall reload
+    usage: /keyall <key> [amount] | /keyall run <schedule> | /keyallmc keyall <keyname> | /keyallmc allkeys <amount> | /keyall reload
     permission: keyallmc.admin
 permissions:
   keyallmc.admin:
