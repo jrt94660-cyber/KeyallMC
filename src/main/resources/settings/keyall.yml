@@ -1,5 +1,5 @@
 # KeyallMC schedule definitions; create more entries under keyalls.
-reward-command: "smpcrate keyall keyall %player%"
+reward-command: "smpcrate keyall keyall"
 announce: true
 announcement: "<gradient:#00B2FF:#62E6FF><bold>KEYALL</bold></gradient> <gray>Everyone received</gray> <white>%amount%x %key%</white> <gray>keys!</gray>"
 timer-message: "<gradient:#00B2FF:#62E6FF>You're about to get %key name% %amount%</gradient>"
