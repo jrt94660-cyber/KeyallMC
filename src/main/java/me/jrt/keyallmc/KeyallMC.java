@@ -77,7 +77,7 @@ public final class KeyallMC extends JavaPlugin {
                 if(s==null || !s.getBoolean("enabled",true)) continue;
                 long remaining=nextRuns.getOrDefault(id,0L)-System.currentTimeMillis();
                 if(remaining<=0) {
-                    distribute(s.getString("key","key"),Math.max(1,s.getInt("amount",1)),id);
+                    distribute(s, id);
                     nextRuns.put(id,System.currentTimeMillis()+Math.max(1,s.getInt("interval-minutes",30))*60_000L);
                 } else {
                     int announceSeconds=Math.max(0,s.getInt("announce-seconds",10));
@@ -91,8 +91,9 @@ public final class KeyallMC extends JavaPlugin {
             }
         },20L,20L);
     }
-    private void distribute(String key,int amount,String id) {
-        String cmd=keyallSettings.getString("reward-command","smpcrate keyall keyall").trim();
+    private void distribute(ConfigurationSection schedule,String id) {
+        String key=schedule.getString("key","key"); int amount=Math.max(1,schedule.getInt("amount",1));
+        String cmd=schedule.getString("reward-command","").trim();
         if(cmd.isBlank()) { getLogger().warning("Reward command is blank; schedule "+id+" skipped."); return; }
         Bukkit.dispatchCommand(Bukkit.getConsoleSender(),
             cmd.replace("%player%","").replace("%key%",key).replace("%amount%",String.valueOf(amount)).trim());
@@ -109,14 +110,16 @@ public final class KeyallMC extends JavaPlugin {
         if(args.length==2 && args[0].equalsIgnoreCase("run")) {
             ConfigurationSection s=keyallSettings.getConfigurationSection("keyalls."+args[1]);
             if(s==null){sendRaw(sender,message("unknown-schedule"));return true;}
-            distribute(s.getString("key","key"),Math.max(1,s.getInt("amount",1)),args[1]); sendRaw(sender,message("schedule-run")); return true;
+            distribute(s,args[1]); sendRaw(sender,message("schedule-run")); return true;
         }
         if(!getConfig().getBoolean("enabled",true)){sendRaw(sender,message("disabled"));return true;}
         if(args.length<1 || args.length>2){sendRaw(sender,message("usage"));return true;}
         String key=args[0].trim(); int amount=1;
         if(args.length==2) try{amount=Integer.parseInt(args[1]);if(amount<=0)throw new NumberFormatException();}catch(NumberFormatException e){sendRaw(sender,message("invalid-amount"));return true;}
         if(Bukkit.getOnlinePlayers().isEmpty()){sendRaw(sender,message("no-players"));return true;}
-        distribute(key,amount,"manual");
+        ConfigurationSection manualSchedule=keyallSettings.getConfigurationSection("keyalls.keyall");
+        if(manualSchedule==null){sendRaw(sender,message("unknown-schedule"));return true;}
+        distribute(manualSchedule,"manual");
         sendRaw(sender,message("success").replace("%amount%",String.valueOf(amount)).replace("%key%",key).replace("%players%",String.valueOf(Bukkit.getOnlinePlayers().size())));
         return true;
     }
