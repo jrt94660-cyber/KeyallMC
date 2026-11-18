@@ -1,4 +1,4 @@
-prefix: "<gradient:#00B2FF:#62E6FF><bold>KEYALL</bold></gradient> <dark_gray>»</dark_gray> "
+prefix: "<gradient:#00B2FF:#62E6FF><bold>KEYALL</bold></gradient> <dark_gray>»</dark_gray>"
 usage: "<gray>Usage: <white>/keyall <key> [amount]</white></gray>"
 invalid-amount: "<red>Amount must be a positive number.</red>"
 unknown-key: "<red>Please specify a crate key.</red>"
