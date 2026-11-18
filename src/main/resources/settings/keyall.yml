@@ -1,5 +1,4 @@
-# KeyallMC schedule definitions; create more entries under keyalls.
-reward-command: "smpcrate keyall keyall"
+# Each keyall schedule has its own reward command.
 announce: true
 announcement: "<gradient:#00B2FF:#62E6FF><bold>KEYALL</bold></gradient> <gray>Everyone received</gray> <white>%amount%x %key%</white> <gray>keys!</gray>"
 timer-message: "<gradient:#00B2FF:#62E6FF>You're about to get %key name% %amount%</gradient>"
@@ -8,5 +7,14 @@ keyalls:
     enabled: true
     key: "keyall"
     amount: 1
+    reward-command: "smpcrate keyall keyall"
     interval-minutes: 30
+    announce-seconds: 10
+
+  gold:
+    enabled: false
+    key: "gold"
+    amount: 1
+    reward-command: "smpcrate keyall gold"
+    interval-minutes: 60
     announce-seconds: 10
