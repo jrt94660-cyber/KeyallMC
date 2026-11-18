@@ -1,0 +1,15 @@
+name: KeyallMC
+version: 1.0.0
+main: me.jrt.keyallmc.KeyallMC
+api-version: '1.21'
+description: Give crate keys to all online players.
+author: JRT
+commands:
+  keyall:
+    description: Give a crate key to all online players.
+    usage: /keyall <key> [amount] | /keyall reload
+    permission: keyallmc.admin
+permissions:
+  keyallmc.admin:
+    description: Allows using KeyallMC commands.
+    default: op
