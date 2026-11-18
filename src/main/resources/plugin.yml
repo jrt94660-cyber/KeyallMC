@@ -1,13 +1,14 @@
 name: KeyallMC
-version: 1.0.0
+version: 1.0.1
 main: me.jrt.keyallmc.KeyallMC
 api-version: '1.21'
-description: Give crate keys to all online players.
+description: Configurable crate key timers and distribution.
 author: JRT
+softdepend: [PlaceholderAPI]
 commands:
   keyall:
-    description: Give a crate key to all online players.
-    usage: /keyall <key> [amount] | /keyall reload
+    description: Distribute or manage keyall schedules.
+    usage: /keyall <key> [amount] | /keyall run <schedule> | /keyall reload
     permission: keyallmc.admin
 permissions:
   keyallmc.admin:
