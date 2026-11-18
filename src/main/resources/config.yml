@@ -1,0 +1,3 @@
+# Main plugin config only. Other settings are in separate files.
+version: 1.0.0
+enabled: true
