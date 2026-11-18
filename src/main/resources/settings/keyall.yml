@@ -1,0 +1,7 @@
+# Keyall command behavior.
+# The command is executed once per online player.
+# Available placeholders: %player%, %key%, %amount%
+reward-command: "crate givekey %player% %key% %amount%"
+# Broadcast announcement after a successful keyall.
+announce: true
+announcement: "<gradient:#00B2FF:#62E6FF><bold>KEYALL</bold></gradient> <gray>Everyone online received</gray> <white>%amount%x %key%</white> <gray>keys!</gray>"
