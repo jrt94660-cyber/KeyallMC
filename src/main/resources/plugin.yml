@@ -1,5 +1,5 @@
 name: KeyallMC
-version: 1.0.1
+version: 1.0.2
 main: me.jrt.keyallmc.KeyallMC
 api-version: '1.21'
 description: Configurable crate key timers and distribution.
