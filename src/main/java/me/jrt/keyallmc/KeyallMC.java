@@ -92,7 +92,7 @@ public final class KeyallMC extends JavaPlugin {
         },20L,20L);
     }
     private void distribute(String key,int amount,String id) {
-        String cmd=keyallSettings.getString("reward-command","smpcrate keyall keyall %player%").trim();
+        String cmd=keyallSettings.getString("reward-command","smpcrate keyall keyall").trim();
         if(cmd.isBlank()) { getLogger().warning("Reward command is blank; schedule "+id+" skipped."); return; }
         for(Player p:Bukkit.getOnlinePlayers()) Bukkit.dispatchCommand(Bukkit.getConsoleSender(),
             cmd.replace("%player%",p.getName()).replace("%key%",key).replace("%amount%",String.valueOf(amount)));
