@@ -92,18 +92,51 @@ public final class KeyallMC extends JavaPlugin {
         },20L,20L);
     }
     private void distribute(ConfigurationSection schedule,String id) {
-        String key=schedule.getString("key","key"); int amount=Math.max(1,schedule.getInt("amount",1));
+        runReward(schedule,id,Math.max(1,schedule.getInt("amount",1)));
+    }
+    private boolean runReward(ConfigurationSection schedule,String id,int amount) {
+        String key=schedule.getString("key","key");
         String cmd=schedule.getString("reward-command","").trim();
-        if(cmd.isBlank()) { getLogger().warning("Reward command is blank; schedule "+id+" skipped."); return; }
+        if(cmd.isBlank()) { getLogger().warning("Reward command is blank; schedule "+id+" skipped."); return false; }
         Bukkit.dispatchCommand(Bukkit.getConsoleSender(),
-            cmd.replace("%player%","").replace("%key%",key).replace("%amount%",String.valueOf(amount)).trim());
+            cmd.replace("%player%","").replace("%key%",key).replace("%amount%",String.valueOf(Math.max(1,amount))).trim());
         if(keyallSettings.getBoolean("announce",true)) {
-            String ann=keyallSettings.getString("announcement","").replace("%key%",key).replace("%amount%",String.valueOf(amount)).replace("%players%",String.valueOf(Bukkit.getOnlinePlayers().size()));
+            String ann=keyallSettings.getString("announcement","").replace("%key%",key).replace("%amount%",String.valueOf(Math.max(1,amount))).replace("%players%",String.valueOf(Bukkit.getOnlinePlayers().size()));
             if(!ann.isBlank()) for(Player p:Bukkit.getOnlinePlayers()) sendRaw(p,ann);
         }
+        return true;
     }
     private boolean onCommand(CommandSender sender,Command cmd,String label,String[] args) {
         if(!sender.hasPermission("keyallmc.admin")) { sendRaw(sender,message("no-permission")); return true; }
+        if(cmd.getName().equalsIgnoreCase("keyallmc")) {
+            if(!getConfig().getBoolean("enabled",true)){sendRaw(sender,message("disabled"));return true;}
+            if(args.length==2 && args[0].equalsIgnoreCase("keyall")) {
+                ConfigurationSection schedules=keyallSettings.getConfigurationSection("keyalls");
+                ConfigurationSection found=null; String idFound=null;
+                if(schedules!=null) for(String id:schedules.getKeys(false)) {
+                    ConfigurationSection sc=schedules.getConfigurationSection(id);
+                    if(sc!=null && (id.equalsIgnoreCase(args[1]) || sc.getString("key","").equalsIgnoreCase(args[1]))) {found=sc;idFound=id;break;}
+                }
+                if(found==null){sendRaw(sender,message("unknown-schedule"));return true;}
+                if(Bukkit.getOnlinePlayers().isEmpty()){sendRaw(sender,message("no-players"));return true;}
+                runReward(found,idFound,1);
+                sendRaw(sender,message("keyallmc-success").replace("%amount%","1").replace("%key%",found.getString("key",args[1])).replace("%players%",String.valueOf(Bukkit.getOnlinePlayers().size())));
+                return true;
+            }
+            if(args.length==2 && args[0].equalsIgnoreCase("allkeys")) {
+                int amount; try{amount=Integer.parseInt(args[1]);if(amount<=0)throw new NumberFormatException();}catch(NumberFormatException e){sendRaw(sender,message("invalid-amount"));return true;}
+                if(Bukkit.getOnlinePlayers().isEmpty()){sendRaw(sender,message("no-players"));return true;}
+                ConfigurationSection schedules=keyallSettings.getConfigurationSection("keyalls"); int count=0;
+                if(schedules!=null) for(String id:schedules.getKeys(false)) {
+                    ConfigurationSection sc=schedules.getConfigurationSection(id);
+                    if(sc!=null && sc.getBoolean("enabled",true) && runReward(sc,id,amount)) count++;
+                }
+                if(count==0){sendRaw(sender,message("unknown-schedule"));return true;}
+                sendRaw(sender,message("allkeys-success").replace("%amount%",String.valueOf(amount)).replace("%keys%",String.valueOf(count)).replace("%players%",String.valueOf(Bukkit.getOnlinePlayers().size())));
+                return true;
+            }
+            sendRaw(sender,message("keyallmc-usage")); return true;
+        }
         if(args.length==1 && args[0].equalsIgnoreCase("reload")) {
             reloadConfig(); loadSeparatedConfigs(); startTimers(); sendRaw(sender,message("reloaded")); return true;
         }
