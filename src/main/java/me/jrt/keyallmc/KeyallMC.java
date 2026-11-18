@@ -62,12 +62,6 @@ public final class KeyallMC extends JavaPlugin {
         }
     }
 
-    // A safe fallback path for bundled defaults. If resource loading itself fails,
-    // return an empty config rather than letting a config error disable the plugin.
-    private String getResourcePath(String ignored) {
-        return getDataFolder().getAbsolutePath() + File.separator + "fallback-" + ignored.replace('/', '_');
-    }
-
     private boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         if (!sender.hasPermission("keyallmc.admin")) {
             sendMessage(sender, "no-permission");
