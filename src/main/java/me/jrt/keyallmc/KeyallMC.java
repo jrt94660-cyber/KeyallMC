@@ -35,6 +35,8 @@ public final class KeyallMC extends JavaPlugin {
         loadSeparatedConfigs();
         var command = getCommand("keyall");
         if (command != null) command.setExecutor(this::onCommand);
+        var keyallmcCommand = getCommand("keyallmc");
+        if (keyallmcCommand != null) keyallmcCommand.setExecutor(this::onCommand);
         if (getConfig().getBoolean("enabled", true)) startTimers();
         if (Bukkit.getPluginManager().getPlugin("PlaceholderAPI") != null) new KeyallPlaceholder(this).register();
         getLogger().info("KeyallMC enabled.");
