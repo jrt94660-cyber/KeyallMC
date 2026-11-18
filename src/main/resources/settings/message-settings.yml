@@ -1,0 +1,8 @@
+# Message destination for default player-facing messages.
+# Options: ACTION_BAR, TITLE, CHAT
+# Invalid values safely fall back to ACTION_BAR.
+destination: ACTION_BAR
+title-subtitle: "<gray>Keyall distribution</gray>"
+title-fade-in: 5
+title-stay: 40
+title-fade-out: 10
