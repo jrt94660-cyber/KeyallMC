@@ -9,3 +9,7 @@ no-players: "<red>No players online.</red>"
 success: "<gray>Gave <white>%amount%x %key%</white> to <white>%players%</white> player(s).</gray>"
 reloaded: "<green>KeyallMC reloaded.</green>"
 no-permission: "<red>No permission.</red>"
+
+keyallmc-usage: "<gray>Usage: <white>/keyallmc keyall <keyname></white> or <white>/keyallmc allkeys <amount></white></gray>"
+keyallmc-success: "<green>Gave <white>%amount%x %key%</white> to <white>%players%</white> player(s).</green>"
+allkeys-success: "<green>Gave <white>%amount%x</white> of <white>%keys%</white> key types to <white>%players%</white> player(s).</green>"
