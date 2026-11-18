@@ -108,7 +108,7 @@ public final class KeyallMC extends JavaPlugin {
         }
         return true;
     }
-    public boolean onCommand(CommandSender sender,Command cmd,String label,String[] args {
+    public boolean onCommand(CommandSender sender,Command cmd,String label,String[] args) {
         if(!sender.hasPermission("keyallmc.admin")) { sendRaw(sender,message("no-permission")); return true; }
         if(cmd.getName().equalsIgnoreCase("keyallmc")) {
             if(!getConfig().getBoolean("enabled",true)){sendRaw(sender,message("disabled"));return true;}
